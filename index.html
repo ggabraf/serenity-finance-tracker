@@ -87,7 +87,11 @@
         );
 
         function FinanceTracker() {
-            const [transactions, setTransactions] = useState([]);
+            // Load transactions from localStorage on mount
+            const [transactions, setTransactions] = useState(() => {
+                const saved = localStorage.getItem('serenity-transactions');
+                return saved ? JSON.parse(saved) : [];
+            });
             const [newTransaction, setNewTransaction] = useState({
                 date: new Date().toISOString().split('T')[0],
                 description: '',
@@ -105,6 +109,11 @@
             const [filterPayment, setFilterPayment] = useState('all');
             const [filterDateRange, setFilterDateRange] = useState('all');
             const [showFilters, setShowFilters] = useState(false);
+
+            // Save transactions to localStorage whenever they change
+            React.useEffect(() => {
+                localStorage.setItem('serenity-transactions', JSON.stringify(transactions));
+            }, [transactions]);
 
             const serviceCategories = [
                 'Massagem Relaxante Premium', 'Massagem Relaxante Kids', 'Massagem Relaxante com Pedras Quentes',
@@ -328,21 +337,48 @@
             };
 
             const exportToCSV = () => {
-                const headers = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Valor Serviço', 'Receita Negócio', 'Comissão Massoterapeuta', 'Nome Massoterapeuta', 'Método'];
+                // No headers - start directly with data rows
                 const rows = transactions.map(t => {
                     if (t.type === 'service') {
-                        return [t.date, 'Serviço', `"${t.description}"`, `"${t.category}"`,
-                                t.servicePrice.toFixed(2), t.businessRevenue.toFixed(2),
-                                t.masseuseCommission.toFixed(2), `"${t.masseuseName}"`, t.paymentMethod];
+                        return [
+                            t.date,
+                            'Serviço',
+                            `"${t.description}"`,
+                            `"${t.category}"`,
+                            t.servicePrice.toFixed(2).replace('.', ','),
+                            t.businessRevenue.toFixed(2).replace('.', ','),
+                            t.masseuseCommission.toFixed(2).replace('.', ','),
+                            `"${t.masseuseName}"`,
+                            t.paymentMethod
+                        ];
                     } else if (t.type === 'giftCardSale') {
-                        return [t.date, 'Vale-presente', `"${t.description}"`, `"${t.category}"`,
-                                t.amount.toFixed(2), t.amount.toFixed(2), '0.00', 'N/A', t.paymentMethod];
+                        return [
+                            t.date,
+                            'Vale-presente',
+                            `"${t.description}"`,
+                            `"${t.category}"`,
+                            t.amount.toFixed(2).replace('.', ','),
+                            t.amount.toFixed(2).replace('.', ','),
+                            '0,00',
+                            'N/A',
+                            t.paymentMethod
+                        ];
                     } else {
-                        return [t.date, 'Despesa', `"${t.description}"`, `"${t.category}"`,
-                                '0.00', '0.00', Math.abs(t.amount).toFixed(2), 'N/A', t.paymentMethod || 'Não especificado'];
+                        return [
+                            t.date,
+                            'Despesa',
+                            `"${t.description}"`,
+                            `"${t.category}"`,
+                            '0,00',
+                            '0,00',
+                            Math.abs(t.amount).toFixed(2).replace('.', ','),
+                            'N/A',
+                            t.paymentMethod || 'Não especificado'
+                        ];
                     }
                 });
-                const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+                
+                const csv = rows.map(row => row.join(';')).join('\n');
                 const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
